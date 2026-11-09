@@ -439,6 +439,21 @@ public:
         }
         vision::Image& img = image_->picture;
         if (!vision::decode_image(data, bytes, img, err)) return {model::Status::Error, err};
+        if (!vis_ && m_.tiers().vision_device >= 0) {
+            // argus fork (--vision-gpu): the encoder has its own card. No memory is borrowed from the expert tier and
+            // the main card's floor does not apply; the encoder stays loaded there for the next image.
+            vision::Mmproj mp;
+            if (!m_.open_mmproj(mp, err)) return {model::Status::Error, err};
+            const VisionPlan pl = plan_image(img.w, img.h, mp.hp().merge, mp.hp().min_pixels);
+            vis_ = std::make_unique<VisionEncoder>();
+            if (!vis_->init(mp, std::max(pl.n_patches(), 4096), m_.vision_blas(), err)) {
+                vis_.reset();
+                return {model::Status::Error, "image encoder on CUDA device " + std::to_string(m_.tiers().vision_device) +
+                                                  ": " + err};
+            }
+            vis_merge_ = mp.hp().merge;
+            vis_min_pixels_ = mp.hp().min_pixels;
+        }
         if (!vis_) {
             release_short_prompt();
             // the encoder takes the memory of the tier's extra copies, and of all its copies when that is short;

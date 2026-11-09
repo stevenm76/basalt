@@ -32,7 +32,7 @@ from serve.engine.image_source import image_sources_of  # noqa: E402
 from serve.engine.flags import flag_value  # noqa: E402
 from serve.engine.mock import MockEngine  # noqa: E402
 from serve.engine.process import ProcessEngine  # noqa: E402
-from serve.engine.vision import (EngineVision, Vision, check_gpu, child_env, engine_args, flag_refused, gpu_card_name,  # noqa: E402
+from serve.engine.vision import (EngineVision, Vision, apply_vision_card, check_gpu, child_env, engine_args, flag_refused, gpu_card_name,  # noqa: E402
                                  gpu_text, gpus_in_play, model_plan, vision_card, vision_env, vision_item)
 from serve.models import dialect_for  # noqa: E402
 from serve.handler import Server, serve  # noqa: E402
@@ -176,6 +176,7 @@ def check_model(a, file_engine: list[str], cli_engine: list[str], used_argv: lis
                 cli_engine += part
             cfg["gpu_smi"] = [c.get("smi", -1) for c in plan.get("cards") or []]
             cfg["args"] += ["--gpu", ",".join(str(i) for i in range(len(plan.get("cards") or [])))]
+            apply_vision_card(cfg, plan)
     for flag in a.skipped:
         lines.append(tagged("engine", f"{flag[2:]} from the top level: this model has no such flag, skipped"))
     cfg["items"] = start_items(file_engine, cli_engine,

@@ -321,13 +321,43 @@ std::string gpu_plan_json(const std::vector<GpuCard>& visible, const GpuChoice& 
         cards += std::string(cards.empty() ? "" : ",") + "{\"visible\":" + std::to_string(i) + ",\"token\":" +
                  json_str(g.token) + ",\"smi\":" + std::to_string(g.smi) + ",\"name\":" + json_str(g.name) + "}";
     }
+    std::string vision;
+    if (c.vision >= 0) {
+        const GpuCard g = (size_t) c.vision < visible.size() ? visible[(size_t) c.vision] : unknown_card(c.vision);
+        vision = ",\"vision\":{\"visible\":" + std::to_string(c.vision) + ",\"token\":" + json_str(g.token) +
+                 ",\"smi\":" + std::to_string(g.smi) + ",\"name\":" + json_str(g.name) +
+                 ",\"device\":" + std::to_string(vision_device(c)) + "}";
+    }
     std::string notes;
     for (const std::string& s : c.notes) notes += (notes.empty() ? "" : ",") + json_str(s);
     return "{" + (arch.empty() ? std::string() : "\"arch\":" + json_str(arch) + ",\"model\":" + json_str(model_name) + ",\"quality_flags\":" + json_str(quality_flags) +
                                      ",\"quality_window\":\"" + std::to_string(quality_window) + "\",\"lossy\":" + json_str(lossy) + ",\"spec\":" +
-                                     std::to_string(spec) + ",\"max_context\":" + std::to_string(max_context) + ",") + "\"devices\":" + json_str(devices) + ",\"cards\":[" + cards + "],\"notes\":[" + notes +
+                                     std::to_string(spec) + ",\"max_context\":" + std::to_string(max_context) + ",") + "\"devices\":" + json_str(devices) + ",\"cards\":[" + cards + "]" + vision + ",\"notes\":[" + notes +
            "],\"warning\":" + json_str(c.warning) + ",\"error\":" + json_str(c.error) + "}";
 }
+
+void choose_vision_card(GpuChoice& c, int vision, size_t n_visible, bool known) {
+    c.vision = -1;
+    if (vision < 0 || !c.error.empty()) return;
+    const std::string head = "vision-gpu " + std::to_string(vision) + ": ";
+    if (std::find(c.cards.begin(), c.cards.end(), vision) != c.cards.end()) {
+        c.error = head + "GPU " + std::to_string(vision) + " is one of the --gpu cards";
+        return;
+    }
+    if (known && (size_t) vision >= n_visible) {
+        c.error = head + std::to_string(n_visible) + " GPUs are visible (0-" + std::to_string(n_visible ? n_visible - 1 : 0) + ")";
+        return;
+    }
+    c.vision = vision;
+}
+
+std::vector<int> with_vision_card(const GpuChoice& c) {
+    std::vector<int> out = c.cards;
+    if (c.vision >= 0) out.push_back(c.vision);
+    return out;
+}
+
+int vision_device(const GpuChoice& c) { return c.vision >= 0 ? (int) c.cards.size() : -1; }
 
 bool select_gpus(const std::string& text, const char* label, std::string& engine_value, std::vector<GpuCard>& used,
                  std::string& err) {
