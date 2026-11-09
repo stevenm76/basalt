@@ -1164,6 +1164,20 @@ class GpuChoice(unittest.TestCase):
         self.assertEqual(plain.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
         self.assertEqual(plain.get("CUDA_DEVICE_ORDER"), os.environ.get("CUDA_DEVICE_ORDER"))
 
+    def test_vision_card_reaches_the_engine_last(self):
+        """argus fork: an in-engine encoder on its own card (--vision-gpu). The engine's --gpu-plan names the card;
+        the engine child sees it AFTER the --gpu cards and is told its narrowed number."""
+        from serve.engine.vision import apply_vision_card, child_env
+        cfg = {"gpu": "0,2,3,4", "args": ["--model", "m", "--vision-gpu", "1"]}
+        apply_vision_card(cfg, {"devices": "0,2,3,4", "cards": [{}, {}, {}, {}],
+                                "vision": {"visible": 1, "token": "1", "smi": 1, "name": "RTX 4060", "device": 4}})
+        self.assertEqual(child_env(cfg)["CUDA_VISIBLE_DEVICES"], "0,2,3,4,1")
+        self.assertEqual(cfg["args"][-2:], ["--vision-gpu", "4"])     # the engine parser lets the later flag win
+        plain = {"gpu": "0,2,3,4", "args": ["--model", "m"]}
+        apply_vision_card(plain, {"devices": "0,2,3,4", "cards": [{}, {}, {}, {}]})
+        self.assertEqual(child_env(plain)["CUDA_VISIBLE_DEVICES"], "0,2,3,4")
+        self.assertEqual(plain["args"], ["--model", "m"])
+
     def test_vision_sidecar_args(self):
         from serve.engine.vision import Vision
         for gpu, want in ((True, ["--gpu"]), (False, [])):

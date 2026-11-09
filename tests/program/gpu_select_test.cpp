@@ -94,6 +94,34 @@ int main() {
                   "{\"devices\":\"1,0\",\"cards\":[{\"visible\":1,\"token\":\"1\",\"smi\":1,\"name\":\"RTX 5060 Ti\"},"
                   "{\"visible\":0,\"token\":\"0\",\"smi\":0,\"name\":\"RTX 5090\"}],\"notes\":[],\"warning\":\"\",\"error\":\"\"}");
     }
+    // --vision-gpu: an image encoder card outside the --gpu cards (argus fork, DeepSeek-V4.1 on gnat's 4060).
+    {
+        const std::vector<GpuCard> v = {card(0, "RTX 5070 Ti", 12, 0, 896, 16), card(1, "RTX 4060", 8, 9, 272, 8),
+                                        card(2, "RTX 5060 Ti", 12, 0, 448, 16), card(3, "RTX 5060 Ti", 12, 0, 448, 16),
+                                        card(4, "RTX 5060 Ti", 12, 0, 448, 16)};
+        GpuChoice c = pick("0,2,3,4", v);
+        choose_vision_card(c, 1, v.size(), true);
+        CHECK(c.error.empty());
+        CHECK(c.vision == 1);
+        CHECK(with_vision_card(c) == std::vector<int>({0, 2, 3, 4, 1}));   // the vision card is the LAST device
+        CHECK(vision_device(c) == 4);
+        CHECK_STR(gpu_plan_json(v, c),
+                  "{\"devices\":\"0,2,3,4\",\"cards\":[{\"visible\":0,\"token\":\"0\",\"smi\":0,\"name\":\"RTX 5070 Ti\"},"
+                  "{\"visible\":2,\"token\":\"2\",\"smi\":2,\"name\":\"RTX 5060 Ti\"},"
+                  "{\"visible\":3,\"token\":\"3\",\"smi\":3,\"name\":\"RTX 5060 Ti\"},"
+                  "{\"visible\":4,\"token\":\"4\",\"smi\":4,\"name\":\"RTX 5060 Ti\"}],"
+                  "\"vision\":{\"visible\":1,\"token\":\"1\",\"smi\":1,\"name\":\"RTX 4060\",\"device\":4},"
+                  "\"notes\":[],\"warning\":\"\",\"error\":\"\"}");
+        GpuChoice main = pick("0,2,3,4", v);
+        choose_vision_card(main, 2, v.size(), true);
+        CHECK_STR(main.error, "vision-gpu 2: GPU 2 is one of the --gpu cards");
+        GpuChoice gone = pick("0,2,3,4", v);
+        choose_vision_card(gone, 5, v.size(), true);
+        CHECK_STR(gone.error, "vision-gpu 5: 5 GPUs are visible (0-4)");
+        GpuChoice off = pick("0,2,3,4", v);
+        choose_vision_card(off, -1, v.size(), true);   // unset: today's behaviour, nothing added
+        CHECK(off.error.empty() && off.vision == -1 && with_vision_card(off) == off.cards && vision_device(off) == -1);
+    }
     // The same cards with the slower one first: auto still makes the 5090 main.
     {
         const std::vector<GpuCard> v = {card(0, "RTX 5060 Ti", 12, 0, 448, 16), card(1, "RTX 5090", 12, 0, 1792, 32)};
