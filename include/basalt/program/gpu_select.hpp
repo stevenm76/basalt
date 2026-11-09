@@ -47,6 +47,7 @@ struct GpuChoice {
     std::vector<std::string> notes; ///< info lines: the cards `auto` skipped
     std::string warning;            ///< unset with more cards visible
     std::string error;              ///< non-empty: no run
+    int vision = -1;                ///< argus fork: the image encoder's own visible card (--vision-gpu), -1 none
 };
 
 /// The choice for `spec` over the visible cards. `known` is false when the visible cards could not be listed (no
@@ -56,6 +57,17 @@ GpuChoice choose_gpus(const GpuSpec& spec, const std::vector<GpuCard>& visible, 
 /// What a chosen card does.
 enum class GpuRole { Main, ExpertTier, Idle };
 const char* gpu_role_name(GpuRole r);
+
+/// argus fork: the image encoder's own card (`--vision-gpu`, a visible number like --gpu's). Sets `c.vision`, or
+/// `c.error` when it is one of the chosen cards or not visible. -1: none, the encoder stays on the main card.
+void choose_vision_card(GpuChoice& c, int vision, size_t n_visible, bool known = true);
+
+/// The cards to narrow the CUDA view to: the chosen ones, main first, then the vision card LAST, so the chosen cards
+/// keep their device numbers.
+std::vector<int> with_vision_card(const GpuChoice& c);
+
+/// The vision card's CUDA device number once the view is narrowed to with_vision_card(c); -1 without one.
+int vision_device(const GpuChoice& c);
 
 /// The inputs of the role decision: the chosen cards, main first, and what this platform and engine can run.
 struct RoleInputs {

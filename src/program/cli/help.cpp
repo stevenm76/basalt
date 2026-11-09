@@ -176,6 +176,7 @@ void usage() {
                  "                       peer-held experts between the GPUs and RAM through host memory.  Auto when not set\n"
                  "                       (on only when it keeps every expert off the SSD).\n"
                  "  --peer-reserve-mib N  VRAM the peer tier leaves free on its card (default 600)\n"
+                 "  --vision-gpu N       DeepSeek-V4.1: encode images on GPU N, a card outside --gpu (argus fork)\n"
                  "  --adapt-every N      adaptive expert tier: a round every N decode windows (default 1 for a\n"
                  "                       server, with or without the peer tier; 4 with the layers split over GPUs\n"
                  "                       and outside --serve; 0 = the VRAM experts stay as loaded)\n"

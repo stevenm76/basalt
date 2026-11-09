@@ -115,6 +115,14 @@ std::optional<int> parse_options(int argc, char** argv, CommonOptions& o, const 
             o.stop_eos = true;
         }
         else if (a == "--peer-reserve-mib") o.peer_reserve_mib = std::atoi(next("--peer-reserve-mib"));
+        else if (a == "--vision-gpu") {
+            const std::string v = next("--vision-gpu");
+            if (v.empty() || v.size() > 3 || v.find_first_not_of("0123456789") != std::string::npos) {
+                basalt::log::error("basalt", "--vision-gpu %s: a GPU number, as nvidia-smi numbers them", v.c_str());
+                return 2;
+            }
+            o.vision_gpu = std::atoi(v.c_str());
+        }
         else if (a == "--expert-profile") o.expert_profile = next("--expert-profile");
         else if (a == "--resident-budget-gib") {
             const double gib = std::atof(next("--resident-budget-gib"));

@@ -35,6 +35,21 @@ VisionPlan plan_image(int w, int h, int merge, int min_pixels, int max_tokens = 
 /// [-1, 1] and rounded to bf16.
 void image_patches(const basalt::vision::Image& src, const VisionPlan& plan, std::vector<float>& rows);
 
+/// argus fork: makes CUDA device `device` current for its lifetime and restores the one before; -1 changes nothing.
+/// The image encoder's own card (--vision-gpu) is entered this way around every call that allocates, frees or runs.
+class DeviceScope {
+public:
+    explicit DeviceScope(int device);
+    ~DeviceScope();
+    DeviceScope(const DeviceScope&) = delete;
+    DeviceScope& operator=(const DeviceScope&) = delete;
+    bool ok() const { return ok_; }
+
+private:
+    int prev_ = -1;
+    bool ok_ = true;
+};
+
 /// The cuBLAS handle the encoders share. Creating it and running its first products takes host memory for good, so the
 /// model opens it at load, before the expert tier reads the free RAM; an encoder borrows it and never destroys it.
 class VisionBlas {
@@ -47,11 +62,16 @@ public:
     /// Creates the handle on the current device and runs one small product of each kind the encoder uses. Does nothing
     /// when already open.
     bool open(std::string& err);
+    /// argus fork: the CUDA device the handle (and every encoder that borrows it) lives on; -1 (default) the current
+    /// one. Set before open.
+    void set_device(int device) { device_ = device; }
+    int device() const { return device_; }
 
     struct Impl;
 
 private:
     friend class VisionEncoder;
+    int device_ = -1;
     std::unique_ptr<Impl> impl_;
 };
 
@@ -72,6 +92,7 @@ public:
     struct Impl;
 
 private:
+    int device_ = -1;   ///< argus fork: the blas handle's device, taken at init
     std::unique_ptr<Impl> impl_;
 };
 
