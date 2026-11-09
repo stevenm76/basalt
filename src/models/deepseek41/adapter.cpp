@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 
 namespace basalt::models::deepseek41 {
 namespace {
@@ -46,8 +47,14 @@ public:
         m->set_diag_dump(req.diag_dump);
         m->set_diag_tier(req.diag_tier_ram, req.diag_tier_vram);
         m->set_tiers(req);
-        if (!req.peer_devices.empty()) m->set_peer_device(req.peer_devices.front());
-        if (req.peer_devices.size() > 1) basalt::log::warn("basalt deepseek41", "one second card holds experts; later cards idle");
+        std::vector<int> peers = req.peer_devices;
+        const size_t cap = (size_t) max_peers();
+        if (peers.size() > cap) {
+            basalt::log::warn("basalt deepseek41", "%zu second cards given, %zu hold experts (BASALT_DS_MAX_PEERS); later cards idle",
+                              peers.size(), cap);
+            peers.resize(cap);
+        }
+        m->set_peer_devices(std::move(peers));
         out = std::move(m);
         return {};
     }
@@ -80,7 +87,13 @@ public:
 
     PreTokenizer pretokenizer() const override { return {"joyai-llm", pretok_joyai}; }
 
-    int max_expert_cards() const override { return 1; }
+    /// Second cards that hold experts: BASALT_DS_MAX_PEERS (1..4), default 4; each takes a block of layers.
+    static int max_peers() {
+        const char* v = std::getenv("BASALT_DS_MAX_PEERS");
+        const int n = v != nullptr && *v != 0 ? std::atoi(v) : 4;
+        return n < 1 ? 1 : n > 4 ? 4 : n;
+    }
+    int max_expert_cards() const override { return max_peers(); }
 
     const char* model_name() const override { return "DeepSeek-V4.1-Flash"; }
 
