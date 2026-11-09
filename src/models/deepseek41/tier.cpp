@@ -142,6 +142,8 @@ bool ExpertTier::open(const Reserve& reserve, float* h_rows, std::string& err) {
     const uint64_t ram_reserve = platform::ram_reserve();
     uint64_t tier_reserve = ram_reserve;   // and the file cache's floor once experts stay in the file
     // the image encoder's cuBLAS handle takes host memory when created, so it is taken before the reading
+    // argus fork: with --vision-gpu the handle (and the encoder) live on that card, not the main one
+    if (m_.tiers().vision) m_.vision_blas().set_device(m_.tiers().vision_device);
     if (m_.tiers().vision && !m_.vision_blas().open(err))
         return false;
     if (!host_.open(m_, 0, m_.sessions(), m_.tiers().vision, err))

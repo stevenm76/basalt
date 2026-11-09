@@ -397,12 +397,24 @@ def engine_args(cfg: dict) -> list[str]:
     return list(cfg["args"])
 
 
+def apply_vision_card(cfg: dict, plan: dict) -> None:
+    """argus fork: an in-engine image encoder on its own card (--vision-gpu). The engine's --gpu-plan names that card
+    under "vision"; the engine child must see it AFTER the --gpu cards (child_env) and be told its number there (the
+    engine's parser lets the later flag win)."""
+    v = plan.get("vision") or {}
+    if not v:
+        return
+    cfg["vision_token"] = str(v["token"])
+    cfg["args"] += ["--vision-gpu", str(int(v["device"]))]
+
+
 def child_env(cfg: dict) -> dict:
-    """The engine environment: only the --gpu cards are visible."""
+    """The engine environment: only the --gpu cards are visible (and, argus fork, the image encoder's own card last)."""
     env = dict(os.environ)
     if gpu_list(cfg):                              # number cards as nvidia-smi does
         env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"      # CUDA's default order differs
-        env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in gpu_list(cfg))
+        cards = [str(i) for i in gpu_list(cfg)] + ([cfg["vision_token"]] if cfg.get("vision_token") else [])
+        env["CUDA_VISIBLE_DEVICES"] = ",".join(cards)
     return env
 
 

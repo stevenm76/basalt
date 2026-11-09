@@ -25,7 +25,8 @@ std::optional<int> select_gpus(CommonOptions& o, std::vector<GpuCard>& chosen_ca
     }
     bool known = false;
     const std::vector<bp::GpuCard> visible = bp::visible_gpus(known);
-    const bp::GpuChoice choice = bp::choose_gpus(spec, visible, known);
+    bp::GpuChoice choice = bp::choose_gpus(spec, visible, known);
+    bp::choose_vision_card(choice, o.vision_gpu, visible.size(), known);
     if (o.gpu_plan) {
         std::printf("%s\n", bp::gpu_plan_json(visible, choice, o.arch, o.quality_flags, o.quality_window, o.plan_spec, o.max_context, o.model_name).c_str());
         return choice.error.empty() ? 0 : 2;
@@ -33,12 +34,19 @@ std::optional<int> select_gpus(CommonOptions& o, std::vector<GpuCard>& chosen_ca
     if (!choice.error.empty()) { basalt::log::error("basalt", "%s", choice.error.c_str()); return 2; }
     for (const std::string& s : choice.notes) basalt::log::info("basalt", "%s", s.c_str());
     if (!choice.warning.empty()) basalt::log::warn("basalt", "%s", choice.warning.c_str());
-    bp::apply_gpus(visible, choice.cards);
+    const std::vector<int> narrowed = bp::with_vision_card(choice);
+    bp::apply_gpus(visible, narrowed);
     int seen = 0;
-    if (cudaGetDeviceCount(&seen) != cudaSuccess || seen < (int) choice.cards.size()) {
+    if (cudaGetDeviceCount(&seen) != cudaSuccess || seen < (int) narrowed.size()) {
         basalt::log::error("basalt", "gpu %s: CUDA sees %d of the %zu GPUs chosen", o.gpu.empty() ? "0" : o.gpu.c_str(),
-                           seen, choice.cards.size());
+                           seen, narrowed.size());
         return 2;
+    }
+    o.vision_device = bp::vision_device(choice);
+    if (choice.vision >= 0) {
+        const bp::GpuCard vc = (size_t) choice.vision < visible.size() ? visible[(size_t) choice.vision] : bp::GpuCard{};
+        basalt::log::info("basalt", "vision: %s%s image encoder (CUDA device %d)", vc.name.empty() ? "GPU" : vc.name.c_str(),
+                          vc.smi >= 0 ? (" (nvidia-smi " + std::to_string(vc.smi) + ")").c_str() : "", o.vision_device);
     }
     bp::RoleInputs ri;
     for (int i : choice.cards) ri.cards.push_back((size_t) i < visible.size() ? visible[(size_t) i] : bp::GpuCard{});
