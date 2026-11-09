@@ -728,7 +728,7 @@ public:
         }
         cudaStream_t st = (cudaStream_t) stream;
         // the second card's share goes out while the head runs: its kernels wait on the card for the plan
-        core::PeerExperts* peer = tier_->peer();
+        core::PeerExperts* peer = tier_->peer_for(il);   // the card that holds this layer's second-card homes
         PeerArm armed;
         if (peer) {
             kernels::NativeExpertLayout limited = L;
@@ -876,7 +876,7 @@ public:
         }
         cudaStream_t st = (cudaStream_t) stream;
         // the second card's share goes out while the head runs: its kernels wait on the card for the plan
-        core::PeerExperts* peer = tier_->peer();
+        core::PeerExperts* peer = tier_->peer_for(il);   // the card that holds this layer's second-card homes
         PeerArm armed;
         if (peer) {
             kernels::NativeExpertLayout limited = L;
