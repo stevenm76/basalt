@@ -147,6 +147,8 @@ core::ExpertTierSpec DsModel::tier_spec() const {
     // the image encoder's cuBLAS handle takes host memory when created, so it opens before the RAM tier reads the free
     // memory, with the prompt path's buffers
     s.host.open = [this](std::string& err) {
+        // argus fork: with --vision-gpu the handle (and the encoder) live on that card, not the main one
+        if (tiers_.vision) vision_blas().set_device(tiers_.vision_device);
         if (tiers_.vision && !vision_blas().open(err)) return false;
         return prompt_host_.open(*this, 0, sessions(), tiers_.vision, err);
     };
