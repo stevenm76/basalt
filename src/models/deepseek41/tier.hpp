@@ -199,6 +199,7 @@ private:
     };
     bool load_ram(std::string& err);
     bool open_share(size_t card, std::string& err);
+    void fill_share_rates();
     int ranked(int layer, int r) const;
     bool load_rank(std::string& err);
     void seed_copies(int64_t n);
