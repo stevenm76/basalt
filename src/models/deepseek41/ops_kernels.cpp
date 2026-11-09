@@ -707,7 +707,7 @@ public:
         }
 
         // the second card's share first: its rows are the last of the two cards' to land
-        core::PeerExperts* peer = tier_->peer();
+        core::PeerExperts* peer = tier_->peer_for(il);   // the card that holds this layer's second-card homes
         if (peer) {
             int32_t kind[ExpertTier::kMaxK] = {};
             for (int r = 0; r < T * K; ++r) kind[r] = lk.peer[uidx[r]] ? 2 : 0;
@@ -816,7 +816,7 @@ public:
         }
 
         // the second card's share first: its rows are the last of the two cards' to land
-        core::PeerExperts* peer = tier_->peer();
+        core::PeerExperts* peer = tier_->peer_for(il);   // the card that holds this layer's second-card homes
         if (peer) {
             int32_t kind[ExpertTier::kMaxK] = {};
             for (int k = 0; k < K; ++k) kind[k] = lk.peer[k] ? 2 : 0;
