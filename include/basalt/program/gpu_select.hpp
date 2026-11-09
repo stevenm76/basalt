@@ -62,6 +62,7 @@ struct GpuChoice {
     std::vector<std::string> notes; ///< info lines
     std::string warning;            ///< unset with more cards visible
     std::string error;              ///< non-empty: no run
+    int vision = -1;                ///< argus fork: the image encoder's own visible card (--vision-gpu), -1 none
 };
 
 /// The choice for the three settings over the visible cards (`mode` One and `share_text` "" when unset). `known` is false
@@ -69,6 +70,17 @@ struct GpuChoice {
 /// as given and `all` is an error.
 GpuChoice choose_gpus(const GpuSpec& spec, GpuMode mode, const std::string& share_text, const std::vector<GpuCard>& visible,
                       bool known = true);
+
+/// argus fork: the image encoder's own card (`--vision-gpu`, a visible number like --gpu's). Sets `c.vision`, or
+/// `c.error` when it is one of the chosen cards or not visible. -1: none, the encoder stays on the main card.
+void choose_vision_card(GpuChoice& c, int vision, size_t n_visible, bool known = true);
+
+/// The cards to narrow the CUDA view to: the chosen ones, main first, then the vision card LAST, so the chosen cards
+/// keep their device numbers.
+std::vector<int> with_vision_card(const GpuChoice& c);
+
+/// The vision card's CUDA device number once the view is narrowed to with_vision_card(c); -1 without one.
+int vision_device(const GpuChoice& c);
 
 /// What a model runs: the most cards each mode takes, 0 = the model does not run it.
 struct GpuModes {

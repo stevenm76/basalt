@@ -507,16 +507,34 @@ public:
         // leave, else in the room of all its copies; images_done gives it back.
         std::string te;
         core::ExpertTier* t = ops_->expert_tier(te);
+        // argus fork (--vision-gpu): the encoder on its own card borrows nothing from the tier and the main card's floor
+        // does not apply to it
+        const bool own_card = m_.tiers().vision_device >= 0;
         const auto above_floor = [&] {
+            if (own_card) return true;
             size_t free_b = 0, total_b = 0;
             return !t || cudaMemGetInfo(&free_b, &total_b) != cudaSuccess || free_b >= t->free_floor();
         };
         const auto lend = [&] {
-            if (!t) return false;
+            if (!t || own_card) return false;
             cudaStreamSynchronize(stream_);
             t->lend_all();
             return true;
         };
+        if (!vis_ && own_card) {
+            // argus fork (--vision-gpu): the encoder has its own card. No memory is borrowed from the expert tier and
+            // the main card's floor does not apply; the encoder stays loaded there for the next image.
+            vision::Mmproj mp;
+            if (!m_.open_mmproj(mp, err)) return {model::Status::Error, err};
+            vis_ = std::make_unique<VisionEncoder>();
+            if (!vis_->init(mp, m_.vision_blas(), err)) {
+                vis_.reset();
+                return {model::Status::Error, "image encoder on CUDA device " + std::to_string(m_.tiers().vision_device) +
+                                                  ": " + err};
+            }
+            vis_merge_ = mp.hp().merge;
+            vis_min_pixels_ = mp.hp().min_pixels;
+        }
         if (!vis_) {
             release_short_prompt();
             cudaStreamSynchronize(stream_);
