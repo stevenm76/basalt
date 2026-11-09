@@ -1,19 +1,29 @@
 // Encodes one image with the DeepSeek-V4.1 vision encoder and compares the embedding block with a reference dump
 // ([int32 n_tokens][int32 width][float data], as written by llama.cpp's mtmd debug option).
-//   ds41_vision_parity PROJECTOR.gguf IMAGE REF.bin [OUT.bin]
+//   ds41_vision_parity [--device N] PROJECTOR.gguf IMAGE REF.bin [OUT.bin]
+// --device N (argus fork): run the encoder on CUDA device N, as --vision-gpu does (default: the current device).
 #include "basalt/models/deepseek41/vision.hpp"
 
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <fstream>
 #include <iterator>
 
 using namespace basalt::models::deepseek41;
 
 int main(int argc, char** argv) {
+    int device = -1;
+    if (argc > 2 && std::string(argv[1]) == "--device") {
+        device = std::atoi(argv[2]);
+        argv[2] = argv[0];
+        argv += 2;
+        argc -= 2;
+    }
     if (argc < 4) {
-        std::fprintf(stderr, "usage: %s PROJECTOR.gguf IMAGE REF.bin [OUT.bin]\n", argv[0]);
+        std::fprintf(stderr, "usage: %s [--device N] PROJECTOR.gguf IMAGE REF.bin [OUT.bin]\n", argv[0]);
         return 2;
     }
     std::string err;
@@ -26,8 +36,10 @@ int main(int argc, char** argv) {
     const VisionPlan pl = plan_image(img.w, img.h, mp.hp().merge, mp.hp().min_pixels);
     std::vector<float> rows;
     image_patches(img, pl, rows);
+    if (device >= 0) std::printf("device %d\n", device);
     std::printf("image %dx%d -> canvas %dx%d, %d patches, %d block rows\n", img.w, img.h, pl.width, pl.height, pl.n_patches(), pl.n_tokens());
     VisionBlas blas;
+    blas.set_device(device);
     VisionEncoder enc;
     if (!enc.init(mp, pl.n_patches(), blas, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
     std::vector<float> out;

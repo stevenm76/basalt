@@ -49,6 +49,10 @@ struct CommonOptions {
     std::vector<double> peer_gbps;
     double main_gbps = 0;         ///< the main card's memory bandwidth (GB/s, 0 unknown)
     int peer_reserve_mib = 600;
+    /// argus fork, --vision-gpu N: the image encoder's own card (a visible number, not one of --gpu's), -1 = the main
+    /// card; `vision_device` its CUDA device once the view is narrowed (the last one), -1 without
+    int vision_gpu = -1;
+    int vision_device = -1;
     bool no_prompt_skip = false;  ///< --no-prompt-skip: every prompt row through every layer
     std::string kv;               ///< --kv: the KV storage, as each model names it (empty: the model's default)
     /// --rope-scaling, --rope-scale, --yarn-* ...: taken by the models that extend their context (basalt/model/rope_flags.hpp)
