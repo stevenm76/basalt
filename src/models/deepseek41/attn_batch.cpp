@@ -374,3 +374,5 @@ std::unique_ptr<AttnBatch> make_attn_batch(const DsModel& model, const AttnCache
 }
 
 }  // namespace basalt::models::deepseek41
+
+// SPEC-062 ccache probe 2026-11-11: comment-only change, branch deleted after the measurement.
