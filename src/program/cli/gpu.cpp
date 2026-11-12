@@ -4,6 +4,7 @@
 #include "basalt/program/options.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdio>
 #include <cuda_runtime.h>
 
@@ -74,7 +75,14 @@ std::optional<int> select_gpus(CommonOptions& o, std::vector<GpuCard>& chosen_ca
     // The split hands a window's activations from one card to the next, and a tier card reads its experts d2d: both
     // want peer access, which every pair must opt into once per process.  A pair the driver refuses is left alone and
     // the copy goes the long way.
-    if (chosen_cards.size() > 1) {
+    // argus (gnat): peer access stays OFF unless BASALT_PEER_ACCESS=1. On gnat the RTX 5070 Ti cannot peer at all and a
+    // 5060 Ti pair's P2P copy has raised Xid 31; turning P2P on there is the owner's call, not a default. Off, every
+    // copy goes the long way, which is how v0.3.2 ran.
+    const char* pa = std::getenv("BASALT_PEER_ACCESS");
+    const bool peer_access = pa && std::string(pa) == "1";
+    if (chosen_cards.size() > 1 && !peer_access)
+        basalt::log::info("basalt", "peer access: off (BASALT_PEER_ACCESS=1 enables it between the cards a run uses)");
+    if (chosen_cards.size() > 1 && peer_access) {
         int pairs = 0, tried = 0, prev = 0;
         cudaGetDevice(&prev);
         for (int a = 0; a < (int) chosen_cards.size(); ++a)
