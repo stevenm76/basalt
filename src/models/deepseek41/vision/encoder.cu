@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 namespace basalt::models::deepseek41 {
 
@@ -258,8 +259,22 @@ struct VisionEncoder::Impl {
     }
 };
 
+DeviceScope::DeviceScope(int device) {
+    if (device < 0) return;
+    if (cudaGetDevice(&prev_) != cudaSuccess) { cudaGetLastError(); prev_ = -1; ok_ = false; return; }
+    if (prev_ == device) { prev_ = -1; return; }
+    if (cudaSetDevice(device) != cudaSuccess) { cudaGetLastError(); prev_ = -1; ok_ = false; }
+}
+
+DeviceScope::~DeviceScope() {
+    if (prev_ >= 0 && cudaSetDevice(prev_) != cudaSuccess) cudaGetLastError();
+}
+
 VisionEncoder::VisionEncoder() : impl_(new Impl) {}
-VisionEncoder::~VisionEncoder() = default;
+VisionEncoder::~VisionEncoder() {
+    DeviceScope on(device_);   // cudaFree on the card the buffers live on
+    impl_.reset();
+}
 int VisionEncoder::width() const { return impl_->proj; }
 
 struct VisionBlas::Impl {
@@ -270,10 +285,18 @@ struct VisionBlas::Impl {
 };
 
 VisionBlas::VisionBlas() : impl_(new Impl) {}
-VisionBlas::~VisionBlas() = default;
+VisionBlas::~VisionBlas() {
+    DeviceScope on(device_);
+    impl_.reset();
+}
 
 bool VisionBlas::open(std::string& err) {
     if (impl_->blas) return true;
+    DeviceScope on(device_);
+    if (!on.ok()) {
+        err = "cannot select the image encoder's GPU (CUDA device " + std::to_string(device_) + ")";
+        return false;
+    }
     if (cublasCreate(&impl_->blas) != CUBLAS_STATUS_SUCCESS) {
         impl_->blas = nullptr;
         err = "cannot create the product handle";
@@ -307,6 +330,12 @@ bool VisionBlas::open(std::string& err) {
 bool VisionEncoder::init(const basalt::vision::Mmproj& mp, int max_patches, VisionBlas& blas, std::string& err) {
     (void) max_patches;
     if (!blas.open(err)) return false;
+    device_ = blas.device();
+    DeviceScope on(device_);
+    if (!on.ok()) {
+        err = "cannot select the image encoder's GPU (CUDA device " + std::to_string(device_) + ")";
+        return false;
+    }
     impl_->blas = blas.impl_->blas;
     if (!impl_->load(mp, err)) {
         if (err.empty()) err = "cannot upload the projector weights";
@@ -319,6 +348,11 @@ static int blocks(size_t n) { return (int) ((n + 255) / 256); }
 
 bool VisionEncoder::encode(const std::vector<float>& rows, const VisionPlan& pl, std::vector<float>& out, std::string& err) {
     Impl& s = *impl_;
+    DeviceScope on(device_);
+    if (!on.ok()) {
+        err = "cannot select the image encoder's GPU (CUDA device " + std::to_string(device_) + ")";
+        return false;
+    }
     const int n = pl.n_patches(), ng = pl.lw * pl.lh, ntok = pl.n_tokens();
     if ((size_t) n * kVisionPatchValues != rows.size()) {
         err = "patch rows do not match the plan";
