@@ -1092,7 +1092,7 @@ bool ExpertTier::read_misses(int layer, const int32_t* ids, int k, bool* reading
     for (int i = 0; i < k; ++i) {
         reading[i] = false;
         const int e = ids[i];
-        if (e < 0 || e >= n_expert_ || res_[base + e] >= 0 || pinned(layer, e) || (peer_ && peer_->slot_ptr(layer, e))) {
+        if (e < 0 || e >= n_expert_ || res_[base + e] >= 0 || pinned(layer, e) || (!peers_.empty() && peer_for(layer)->slot_ptr(layer, e))) {
             for (int j = 0; j < i; ++j) reading[i] = reading[i] || (reading[j] && ids[j] == e);
             continue;
         }
